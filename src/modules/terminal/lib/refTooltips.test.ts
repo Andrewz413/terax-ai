@@ -7,7 +7,7 @@ import {
   normalizeRefPatterns,
 } from "./refTooltips";
 
-const valid = { id: "a", pattern: "\\b[DR]-\\d{3}\\b", file: "/gd/log.md" };
+const valid = { id: "a", pattern: "\\b[DR]-\\d{3}\\b", files: ["/gd/log.md"] };
 
 describe("normalizeRefPatterns", () => {
   it("returns [] for anything that is not an array", () => {
@@ -23,16 +23,30 @@ describe("normalizeRefPatterns", () => {
         valid,
         null,
         "x",
-        { id: "", pattern: "a", file: "f" },
-        { id: "b", pattern: 3, file: "f" },
+        { id: "", pattern: "a", files: ["f"] },
+        { id: "b", pattern: 3, files: ["f"] },
         { id: "c", pattern: "a" },
       ]),
     ).toEqual([valid]);
   });
 
-  it("keeps empty pattern and file so drafts survive a settings roundtrip", () => {
+  it("accepts the legacy single-file shape and the ;-joined form", () => {
+    expect(
+      normalizeRefPatterns([
+        { id: "a", pattern: "x", file: "/gd/log.md" },
+        { id: "b", pattern: "x", file: "/gd/a.md; /gd/b.md" },
+        { id: "c", pattern: "x", files: ["/gd/a.md", "/gd/b.md"] },
+      ]),
+    ).toEqual([
+      { id: "a", pattern: "x", files: ["/gd/log.md"] },
+      { id: "b", pattern: "x", files: ["/gd/a.md", "/gd/b.md"] },
+      { id: "c", pattern: "x", files: ["/gd/a.md", "/gd/b.md"] },
+    ]);
+  });
+
+  it("keeps empty pattern and files so drafts survive a settings roundtrip", () => {
     expect(normalizeRefPatterns([{ id: "a", pattern: "", file: "" }])).toEqual([
-      { id: "a", pattern: "", file: "" },
+      { id: "a", pattern: "", files: [] },
     ]);
   });
 
@@ -40,7 +54,7 @@ describe("normalizeRefPatterns", () => {
     const [p] = normalizeRefPatterns([
       { id: "a", pattern: "x", file: "C:\\gd\\log.md" },
     ]);
-    expect(p.file).toBe("C:/gd/log.md");
+    expect(p.files).toEqual(["C:/gd/log.md"]);
   });
 });
 
@@ -56,13 +70,13 @@ describe("compileRefPatterns", () => {
   it("compiles with the global flag and skips invalid or incomplete entries", () => {
     const compiled = compileRefPatterns([
       valid,
-      { id: "bad", pattern: "[", file: "/f.md" },
-      { id: "draft", pattern: "", file: "/f.md" },
-      { id: "nofile", pattern: "x", file: "" },
+      { id: "bad", pattern: "[", files: ["/f.md"] },
+      { id: "draft", pattern: "", files: ["/f.md"] },
+      { id: "nofile", pattern: "x", files: [] },
     ]);
     expect(compiled).toHaveLength(1);
     expect(compiled[0].regex.global).toBe(true);
-    expect(compiled[0].file).toBe(valid.file);
+    expect(compiled[0].files).toEqual(valid.files);
   });
 });
 
@@ -87,7 +101,7 @@ describe("matchRefsInLine", () => {
   it("merges matches from several patterns sorted by column", () => {
     const two = compileRefPatterns([
       valid,
-      { id: "b", pattern: "TA-\\d{3}", file: "/gd/ta.md" },
+      { id: "b", pattern: "TA-\\d{3}", files: ["/gd/ta.md"] },
     ]);
     const matches = matchRefsInLine("TA-006 y D-005", two);
     expect(matches.map((m) => m.text)).toEqual(["TA-006", "D-005"]);
@@ -96,8 +110,8 @@ describe("matchRefsInLine", () => {
 
   it("drops overlapping matches, first pattern wins", () => {
     const overlapping = compileRefPatterns([
-      { id: "a", pattern: "D-\\d{3}", file: "/a.md" },
-      { id: "b", pattern: "D-\\d{3}\\b", file: "/b.md" },
+      { id: "a", pattern: "D-\\d{3}", files: ["/a.md"] },
+      { id: "b", pattern: "D-\\d{3}\\b", files: ["/b.md"] },
     ]);
     const matches = matchRefsInLine("D-005", overlapping);
     expect(matches).toHaveLength(1);
@@ -105,7 +119,9 @@ describe("matchRefsInLine", () => {
   });
 
   it("never loops on a regex that can match the empty string", () => {
-    const zero = compileRefPatterns([{ id: "z", pattern: "x*", file: "/f" }]);
+    const zero = compileRefPatterns([
+      { id: "z", pattern: "x*", files: ["/f"] },
+    ]);
     const matches = matchRefsInLine("axxa", zero);
     expect(matches.map((m) => [m.x, m.text])).toEqual([[1, "xx"]]);
   });

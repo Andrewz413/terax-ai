@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,14 +14,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import {
-  isValidRefRegex,
-  type TerminalRefPattern,
-} from "@/modules/terminal/lib/refTooltips";
 import {
   setAgentNotifications,
   setAutostart,
@@ -41,6 +37,11 @@ import {
   TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
 } from "@/modules/settings/store";
+import {
+  isValidRefRegex,
+  normalizeRefFiles,
+  type TerminalRefPattern,
+} from "@/modules/terminal/lib/refTooltips";
 import { useTheme } from "@/modules/theme";
 import {
   Cancel01Icon,
@@ -484,7 +485,7 @@ function RefTooltipPatterns() {
     <>
       <SettingRow
         title="Reference tooltips"
-        description="Hover a matching token (e.g. an issue or decision id) to see its definition from a markdown file. Click opens the file at the definition."
+        description="Hover a matching token (e.g. an issue or decision id) to see its definition from a markdown file. Click opens the file at the definition. Several files (separated by ;) are searched in order."
       >
         <button
           type="button"
@@ -492,7 +493,7 @@ function RefTooltipPatterns() {
           onClick={() =>
             update([
               ...patterns,
-              { id: crypto.randomUUID().slice(0, 8), pattern: "", file: "" },
+              { id: crypto.randomUUID().slice(0, 8), pattern: "", files: [] },
             ])
           }
         >
@@ -522,15 +523,16 @@ function RefPatternRow({
   onCommit: (next: TerminalRefPattern) => void;
   onRemove: () => void;
 }) {
+  const joined = value.files.join("; ");
   const [pattern, setPattern] = useState(value.pattern);
-  const [file, setFile] = useState(value.file);
+  const [file, setFile] = useState(joined);
   useEffect(() => setPattern(value.pattern), [value.pattern]);
-  useEffect(() => setFile(value.file), [value.file]);
+  useEffect(() => setFile(joined), [joined]);
 
   const invalid = pattern !== "" && !isValidRefRegex(pattern);
   const commit = () => {
-    if (pattern === value.pattern && file === value.file) return;
-    onCommit({ ...value, pattern, file });
+    if (pattern === value.pattern && file === joined) return;
+    onCommit({ ...value, pattern, files: normalizeRefFiles(file) ?? [] });
   };
   const commitOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
@@ -552,7 +554,7 @@ function RefPatternRow({
       />
       <Input
         value={file}
-        placeholder="Path to a markdown lookup file"
+        placeholder="Markdown lookup file(s); separate fallbacks with ;"
         spellCheck={false}
         onChange={(e) => setFile(e.target.value)}
         onBlur={commit}

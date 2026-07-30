@@ -1,13 +1,13 @@
 export type TerminalRefPattern = {
   id: string;
   pattern: string;
-  file: string;
+  files: string[];
 };
 
 export type CompiledRefPattern = {
   id: string;
   regex: RegExp;
-  file: string;
+  files: string[];
 };
 
 export type RefMatch = {
@@ -31,16 +31,33 @@ export function isValidRefRegex(source: string): boolean {
   }
 }
 
+export function normalizeRefFiles(value: unknown): string[] | null {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : null;
+  if (raw === null) return null;
+  return raw
+    .filter((f): f is string => typeof f === "string")
+    .flatMap((f) => f.split(";"))
+    .map((f) => f.replace(/\\/g, "/").trim())
+    .filter((f) => f !== "");
+}
+
 export function normalizeRefPatterns(value: unknown): TerminalRefPattern[] {
   if (!Array.isArray(value)) return [];
   const out: TerminalRefPattern[] = [];
   for (const item of value) {
     if (typeof item !== "object" || item === null) continue;
-    const { id, pattern, file } = item as Record<string, unknown>;
+    const { id, pattern, file, files } = item as Record<string, unknown>;
     if (typeof id !== "string" || id === "") continue;
     if (typeof pattern !== "string") continue;
-    if (typeof file !== "string") continue;
-    out.push({ id, pattern, file: file.replace(/\\/g, "/") });
+    // `files` is the canonical shape; `file` (string, `;`-separable) is the
+    // legacy settings shape and what the single-input settings row commits.
+    const list = normalizeRefFiles(files !== undefined ? files : file);
+    if (list === null) continue;
+    out.push({ id, pattern, files: list });
   }
   return out;
 }
@@ -50,9 +67,9 @@ export function compileRefPatterns(
 ): CompiledRefPattern[] {
   const out: CompiledRefPattern[] = [];
   for (const p of patterns) {
-    if (p.pattern === "" || p.file === "") continue;
+    if (p.pattern === "" || p.files.length === 0) continue;
     try {
-      out.push({ id: p.id, regex: new RegExp(p.pattern, "g"), file: p.file });
+      out.push({ id: p.id, regex: new RegExp(p.pattern, "g"), files: p.files });
     } catch {
       // Invalid regex mid-edit in settings or corrupt on disk: skip, never throw.
     }
