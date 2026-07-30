@@ -15,6 +15,7 @@ import {
 } from "./terminalClipboard";
 import { pasteIntoTerminal } from "./terminalPaste";
 import { terminalReadlineSequence } from "./keymap";
+import { createRefLinkProvider } from "./refTooltipController";
 
 export const POOL_MAX_SIZE = 5;
 const FIT_DEBOUNCE_MS = 8;
@@ -213,6 +214,7 @@ function createSlot(): Slot {
   term.loadAddon(
     new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)),
   );
+  term.registerLinkProvider(createRefLinkProvider(term));
 
   const host = document.createElement("div");
   host.style.cssText = "width:100%;height:100%;";
@@ -286,7 +288,8 @@ function createSlot(): Slot {
       if (event.type === "keydown") {
         const targetLeafId = slot.currentLeafId;
         void readTerminalClipboard().then((text) => {
-          if (text && slot.currentLeafId === targetLeafId) slot.term.paste(text);
+          if (text && slot.currentLeafId === targetLeafId)
+            slot.term.paste(text);
         });
       }
       event.preventDefault();

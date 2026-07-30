@@ -13,9 +13,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
+import {
+  isValidRefRegex,
+  type TerminalRefPattern,
+} from "@/modules/terminal/lib/refTooltips";
 import {
   setAgentNotifications,
   setAutostart,
@@ -28,6 +33,7 @@ import {
   setTerminalFontSize,
   setTerminalFontWeight,
   setTerminalLetterSpacing,
+  setTerminalRefPatterns,
   setTerminalScrollback,
   setTerminalShell,
   setTerminalWebglEnabled,
@@ -37,6 +43,7 @@ import {
 } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
+  Cancel01Icon,
   ComputerIcon,
   Moon02Icon,
   Sun03Icon,
@@ -425,6 +432,7 @@ export function GeneralSection() {
             </SelectContent>
           </Select>
         </SettingRow>
+        <RefTooltipPatterns />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -463,6 +471,102 @@ export function GeneralSection() {
           </SettingRow>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RefTooltipPatterns() {
+  const patterns = usePreferencesStore((s) => s.terminalRefPatterns);
+  const update = (next: TerminalRefPattern[]) =>
+    void setTerminalRefPatterns(next);
+
+  return (
+    <>
+      <SettingRow
+        title="Reference tooltips"
+        description="Hover a matching token (e.g. an issue or decision id) to see its definition from a markdown file. Click opens the file at the definition."
+      >
+        <button
+          type="button"
+          className="h-8 rounded-md border border-border px-3 text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground"
+          onClick={() =>
+            update([
+              ...patterns,
+              { id: crypto.randomUUID().slice(0, 8), pattern: "", file: "" },
+            ])
+          }
+        >
+          Add pattern
+        </button>
+      </SettingRow>
+      {patterns.map((p) => (
+        <RefPatternRow
+          key={p.id}
+          value={p}
+          onCommit={(next) =>
+            update(patterns.map((it) => (it.id === next.id ? next : it)))
+          }
+          onRemove={() => update(patterns.filter((it) => it.id !== p.id))}
+        />
+      ))}
+    </>
+  );
+}
+
+function RefPatternRow({
+  value,
+  onCommit,
+  onRemove,
+}: {
+  value: TerminalRefPattern;
+  onCommit: (next: TerminalRefPattern) => void;
+  onRemove: () => void;
+}) {
+  const [pattern, setPattern] = useState(value.pattern);
+  const [file, setFile] = useState(value.file);
+  useEffect(() => setPattern(value.pattern), [value.pattern]);
+  useEffect(() => setFile(value.file), [value.file]);
+
+  const invalid = pattern !== "" && !isValidRefRegex(pattern);
+  const commit = () => {
+    if (pattern === value.pattern && file === value.file) return;
+    onCommit({ ...value, pattern, file });
+  };
+  const commitOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/20 px-3 py-1.5">
+      <Input
+        value={pattern}
+        placeholder="Regex, e.g. \b[A-Z]+-\d+\b"
+        spellCheck={false}
+        onChange={(e) => setPattern(e.target.value)}
+        onBlur={commit}
+        onKeyDown={commitOnEnter}
+        className={cn(
+          "h-7 w-44 font-mono text-[12px]",
+          invalid && "border-destructive",
+        )}
+      />
+      <Input
+        value={file}
+        placeholder="Path to a markdown lookup file"
+        spellCheck={false}
+        onChange={(e) => setFile(e.target.value)}
+        onBlur={commit}
+        onKeyDown={commitOnEnter}
+        className="h-7 flex-1 font-mono text-[12px]"
+      />
+      <button
+        type="button"
+        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        title="Remove pattern"
+        onClick={onRemove}
+      >
+        <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+      </button>
     </div>
   );
 }

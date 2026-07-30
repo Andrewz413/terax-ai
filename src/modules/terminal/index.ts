@@ -1,4 +1,5 @@
 export { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+export { TerminalRefTooltip } from "./components/TerminalRefTooltip";
 export { TerminalStack } from "./TerminalStack";
 export {
   clearFocusedTerminal,

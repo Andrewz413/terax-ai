@@ -88,6 +88,7 @@ import {
   ptyIdForLeaf,
   type PaneBounds,
   type TerminalPaneHandle,
+  TerminalRefTooltip,
   useAgentActivityStore,
   useTerminalFileDrop,
   whenSessionReady,
@@ -1363,6 +1364,7 @@ export default function App() {
             onActivate={onActivateAgent}
           />
           <Toaster position="bottom-right" />
+          <TerminalRefTooltip />
 
           {hasComposer ? (
             <>
